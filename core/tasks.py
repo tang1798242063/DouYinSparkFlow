@@ -244,7 +244,26 @@ def do_user_task(browser, username, cookies, targets):
 
     time.sleep(5)  # 等待5秒让过可能存在的弹窗
 
+    # logger.debug(f"账号 {username} 开始发送消息")
+    # # 滚动并选择用户
+    # for username in scroll_and_select_user(page, username, targets):
+    time.sleep(5)  # 等待5秒让过可能存在的弹窗
+    
+    logger.debug(f"当前页面 URL: {page.url}")
+    logger.debug(f"当前页面标题: {page.title()}")
+    
+    # 在查找好友列表之前先截图
+    page.screenshot(
+        path="logs/chat-page-before-search.png",
+        full_page=True,
+    )
+    
+    # 同时保存当前页面 HTML，方便排查 selector 是否变化
+    with open("logs/chat-page.html", "w", encoding="utf-8") as f:
+        f.write(page.content())
+    
     logger.debug(f"账号 {username} 开始发送消息")
+    
     # 滚动并选择用户
     for username in scroll_and_select_user(page, username, targets):
         logger.debug(f"账号 {username} 已选中好友 {username} 发送消息")
