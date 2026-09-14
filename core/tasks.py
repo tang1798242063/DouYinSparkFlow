@@ -261,11 +261,32 @@ def do_user_task(browser, username, cookies, targets):
             if line != message.split("\\n")[-1]:
                 chat_input.press("Shift+Enter")  # 模拟 Shift+Enter 插入换行
 
+        # logger.debug(f"账号 {username} 准备发送消息给好友 {username}：\n\t{message}")
+        # logger.debug(f"账号 {username} 给好友 {username} 发送消息完成")
+        # # 模拟按下回车键发送消息
+        # chat_input.press("Enter")
+        # time.sleep(2)  # 发送完等待一会儿
+
+
         logger.debug(f"账号 {username} 准备发送消息给好友 {username}：\n\t{message}")
-        logger.debug(f"账号 {username} 给好友 {username} 发送消息完成")
+        
+        # 发送前截图
+        page.screenshot(
+            path=f"logs/{username}-before-send.png",
+            full_page=True,
+        )
+        
         # 模拟按下回车键发送消息
         chat_input.press("Enter")
-        time.sleep(2)  # 发送完等待一会儿
+        time.sleep(3)
+        
+        # 发送后截图
+        page.screenshot(
+            path=f"logs/{username}-after-send.png",
+            full_page=True,
+        )
+        
+        logger.debug(f"账号 {username} 给好友 {username} 执行发送操作完成")
 
     context.close()  # 任务完成后关闭上下文
 
