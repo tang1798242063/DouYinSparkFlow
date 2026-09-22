@@ -1,4 +1,5 @@
 import traceback
+import hashlib
 from utils.logger import setup_logger
 from utils.config import get_config, get_userData
 from utils import norm
@@ -33,7 +34,7 @@ def handle_response(response: Response):
             json_data = response.json()
             # print("\n📦 响应 JSON 数据：")
             # print(json.dumps(json_data, indent=4, ensure_ascii=False))
-            for item in json_data.get("data", []):
+            for item in json_data.get("data") or []:
                 short_id = item.get("short_id")
                 unique_id = item.get("unique_id")
                 sec_uid = item.get("sec_uid", "")
@@ -289,9 +290,12 @@ def do_user_task(browser, username, cookies, targets):
 
         logger.debug(f"账号 {username} 准备发送消息给好友 {username}：\n\t{message}")
         
+        # 使用固定的安全标识，避免昵称中的特殊字符导致日志上传失败。
+        screenshot_id = hashlib.sha256(username.encode("utf-8")).hexdigest()[:16]
+
         # 发送前截图
         page.screenshot(
-            path=f"logs/{username}-before-send.png",
+            path=f"logs/{screenshot_id}-before-send.png",
             full_page=True,
         )
         
@@ -301,7 +305,7 @@ def do_user_task(browser, username, cookies, targets):
         
         # 发送后截图
         page.screenshot(
-            path=f"logs/{username}-after-send.png",
+            path=f"logs/{screenshot_id}-after-send.png",
             full_page=True,
         )
         
@@ -337,3 +341,4 @@ def runTasks():
         browser.close()
 
         playwright.stop()
+
