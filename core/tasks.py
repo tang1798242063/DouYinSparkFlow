@@ -31,7 +31,7 @@ def wait_for_chat_ready(page):
             login.click()
             clicked_login = True
         page.wait_for_timeout(500)
-    page.screenshot(path="logs/chat-not-ready.png", full_page=True)
+    capture_screenshot(page, path="logs/chat-not-ready.png", full_page=True)
     raise RuntimeError("未进入聊天列表：请检查登录状态或页面加载情况。当前浏览器登录不会自动更新 GitHub Cookie。")
 
 
@@ -301,7 +301,7 @@ def do_user_task(browser, username, cookies, targets):
     logger.debug(f"当前页面标题: {page.title()}")
     
     # 在查找好友列表之前先截图
-    page.screenshot(
+    capture_screenshot(page, 
         path="logs/chat-page-before-search.png",
         full_page=True,
     )
@@ -341,7 +341,7 @@ def do_user_task(browser, username, cookies, targets):
         screenshot_id = hashlib.sha256(username.encode("utf-8")).hexdigest()[:16]
 
         # 发送前截图
-        page.screenshot(
+        capture_screenshot(page, 
             path=f"logs/{screenshot_id}-before-send.png",
             full_page=True,
         )
@@ -352,10 +352,10 @@ def do_user_task(browser, username, cookies, targets):
         try:
             wait_for_send_settled(page, message, before_count)
         finally:
-            page.screenshot(path=f"logs/{screenshot_id}-send-status.png", full_page=True)
+            capture_screenshot(page, path=f"logs/{screenshot_id}-send-status.png", full_page=True)
         
         # 发送后截图
-        page.screenshot(
+        capture_screenshot(page, 
             path=f"logs/{screenshot_id}-after-send.png",
             full_page=True,
         )
@@ -393,3 +393,10 @@ def runTasks():
 
         playwright.stop()
 
+
+
+def capture_screenshot(page, **kwargs):
+    try:
+        page.screenshot(timeout=10000, **kwargs)
+    except Exception as exc:
+        logger.warning(f"诊断截图未保存，继续处理任务: {type(exc).__name__}")
