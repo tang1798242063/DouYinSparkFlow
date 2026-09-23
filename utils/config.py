@@ -95,7 +95,9 @@ def get_userData():
         session_markers = ("sessionid", "sessionid_ss", "sid_tt", "sid_guard")
         expiry_values = [cookie["expires"] for cookie in cookies if "expires" in cookie]
         expired_count = sum(value <= time.time() for value in expiry_values)
-        logger.info(f"{cookies_key} parsed: count={len(cookies)}, session_markers_present={[name for name in session_markers if name in cookie_names]}, expired_count={expired_count}")
+        marker_status = {name: next(("expired" if cookie.get("expires", float("inf")) <= time.time() else "active" for cookie in cookies if cookie["name"] == name), "missing") for name in session_markers}
+        expired_names = sorted(cookie["name"] for cookie in cookies if cookie.get("expires", float("inf")) <= time.time())
+        logger.info(f"{cookies_key} parsed: count={len(cookies)}, session_markers={marker_status}, expired_count={expired_count}, expired_names={expired_names}")
         userData.append({
             "unique_id": unique_id,
             "username": username,
