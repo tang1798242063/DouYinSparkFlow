@@ -1,5 +1,8 @@
 import traceback
 import hashlib
+import os
+from urllib.parse import urlsplit
+os.environ["PW_TEST_SCREENSHOT_NO_FONTS_READY"] = "1"
 from utils.logger import setup_logger
 from utils.config import get_config, get_userData
 from utils import norm
@@ -62,6 +65,15 @@ def wait_for_send_settled(page, message, before_count, timeout=60):
         else:
             stable_since = None
         page.wait_for_timeout(500)
+    status = page.locator(".messageMessageBoxisFromMe").evaluate_all(
+        """nodes => nodes.slice(0, 3).map(n => ({
+            text: n.querySelector('.TextMessageTextpureText')?.textContent,
+            side: Array.from(n.querySelector('.MessageBoxContentSidewrapper')?.querySelectorAll('*') || []).map(e => ({
+                tag: e.tagName, cls: e.getAttribute('class'), title: e.getAttribute('title'), aria: e.getAttribute('aria-label'), text: e.textContent?.slice(0, 100)
+            }))
+        }))"""
+    )
+    logger.error(f"发送诊断: before_count={before_count}, current_states={states}, latest={status}")
     raise RuntimeError("消息仍在发送中、发送失败或无法确认状态，已停止以避免重复发送。")
 
 
@@ -274,6 +286,15 @@ def do_user_task(browser, username, cookies, targets):
     )  # 设置所有操作的默认超时时间为 120 秒
 
     page = context.new_page()
+    def network_failure(request):
+        url = urlsplit(request.url)
+        logger.warning(f"网络请求失败: {request.method} {url.netloc}{url.path} {request.failure}")
+    def http_failure(response):
+        if response.status >= 400:
+            url = urlsplit(response.url)
+            logger.warning(f"HTTP 错误: {response.status} {url.netloc}{url.path}")
+    page.on("requestfailed", network_failure)
+    page.on("response", http_failure)
 
     page.on("response", handle_response)  # 监听响应，收集好友完整信息用于匹配
 
