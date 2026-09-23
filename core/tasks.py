@@ -19,6 +19,52 @@ CONVERSATION_TITLE_SELECTOR = ".conversationConversationItemtitle"
 CONVERSATION_LIST_SELECTOR = ".conversationConversationListwrapper"
 CHAT_EDITOR_SELECTOR = ".messageEditorimChatEditorContainer"
 
+def wait_for_chat_ready(page):
+    """等待真正的聊天列表；已记住账号时完成一键登录。"""
+    deadline = time.monotonic() + config["browserTimeout"] / 1000
+    clicked_login = False
+    while time.monotonic() < deadline:
+        if page.locator(CONVERSATION_ITEM_SELECTOR).count():
+            return
+        login = page.get_by_text("一键登录", exact=True)
+        if not clicked_login and login.count() == 1 and login.is_visible():
+            login.click()
+            clicked_login = True
+        page.wait_for_timeout(500)
+    page.screenshot(path="logs/chat-not-ready.png", full_page=True)
+    raise RuntimeError("未进入聊天列表：请检查登录状态或页面加载情况。当前浏览器登录不会自动更新 GitHub Cookie。")
+
+
+def message_count(page, message):
+    return page.locator(".messageMessageBoxisFromMe .TextMessageTextpureText").evaluate_all(
+        "(nodes, text) => nodes.filter(n => n.textContent === text).length", message
+    )
+
+
+def wait_for_send_settled(page, message, before_count, timeout=60):
+    """不重发：等待新消息出现且状态栏清空；异常或不确定时令任务失败。"""
+    deadline = time.monotonic() + timeout
+    stable_since = None
+    while time.monotonic() < deadline:
+        states = page.locator(".messageMessageBoxisFromMe").evaluate_all(
+            """(nodes, text) => nodes.filter(n =>
+                n.querySelector('.TextMessageTextpureText')?.textContent === text
+            ).map(n => {
+                const side = n.querySelector('.MessageBoxContentSidewrapper');
+                return side !== null && side.childElementCount === 0 && !side.textContent.trim();
+            })""", message
+        )
+        if len(states) > before_count and all(states):
+            if stable_since is None:
+                stable_since = time.monotonic()
+            if time.monotonic() - stable_since >= 5:
+                return
+        else:
+            stable_since = None
+        page.wait_for_timeout(500)
+    raise RuntimeError("消息仍在发送中、发送失败或无法确认状态，已停止以避免重复发送。")
+
+
 
 def handle_response(response: Response):
     """
@@ -172,7 +218,7 @@ def scroll_and_select_user(page, username, targets):
                     logger.warning(
                         f"账号 {username} 搜索结束，仍有以下好友未找到: {remaining_targets}"
                     )
-                break
+                raise RuntimeError(f"未完成目标好友查找: {remaining_targets}")
 
             # 3. 检查是否正在加载
             # if page.locator(loading_selector).count() > 0:
@@ -215,7 +261,7 @@ def scroll_and_select_user(page, username, targets):
                 time.sleep(1.5)
             else:
                 logger.error(f"账号 {username} 未找到滚动容器，退出")
-                break
+                raise RuntimeError(f"好友列表不可用，未完成目标: {remaining_targets}")
 
 
 def do_user_task(browser, username, cookies, targets):
@@ -241,9 +287,10 @@ def do_user_task(browser, username, cookies, targets):
         retries=config["taskRetryTimes"],
         delay=5,
         url="https://www.douyin.com/chat",
+        wait_until="domcontentloaded",
     )
 
-    time.sleep(5)  # 等待5秒让过可能存在的弹窗
+    wait_for_chat_ready(page)
 
     # logger.debug(f"账号 {username} 开始发送消息")
     # # 滚动并选择用户
@@ -271,7 +318,7 @@ def do_user_task(browser, username, cookies, targets):
         # 等待聊天输入框元素加载完成，使用更稳定的属性选择器
         chat_input_selector = CHAT_EDITOR_SELECTOR
         page.wait_for_selector(chat_input_selector, timeout=config["browserTimeout"])
-        chat_input = page.locator(chat_input_selector)
+        chat_input = page.locator(chat_input_selector).locator('[contenteditable="true"]')
 
         # 在 chat-input-dccKiL 中输入内容
         message = build_message()
@@ -300,8 +347,12 @@ def do_user_task(browser, username, cookies, targets):
         )
         
         # 模拟按下回车键发送消息
+        before_count = message_count(page, message)
         chat_input.press("Enter")
-        time.sleep(3)
+        try:
+            wait_for_send_settled(page, message, before_count)
+        finally:
+            page.screenshot(path=f"logs/{screenshot_id}-send-status.png", full_page=True)
         
         # 发送后截图
         page.screenshot(
@@ -309,7 +360,7 @@ def do_user_task(browser, username, cookies, targets):
             full_page=True,
         )
         
-        logger.debug(f"账号 {username} 给好友 {username} 执行发送操作完成")
+        logger.info(f"好友 {username} 新消息已出现，页面发送状态已稳定（不代表对方已读）")
 
     context.close()  # 任务完成后关闭上下文
 
