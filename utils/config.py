@@ -1,6 +1,7 @@
 import os, sys
 from enum import Enum
 import json
+import time
 import logging
 from utils.logger import setup_logger
 from utils import norm
@@ -90,6 +91,11 @@ def get_userData():
             cookies = sanitize_cookies(cookies)
         except (json.JSONDecodeError, ValueError, TypeError) as exc:
             raise ValueError(f"{cookies_key} 格式不正确，请使用 Cookie-Editor 导出的 JSON 列表") from exc
+        cookie_names = {cookie["name"] for cookie in cookies}
+        session_markers = ("sessionid", "sessionid_ss", "sid_tt", "sid_guard")
+        expiry_values = [cookie["expires"] for cookie in cookies if "expires" in cookie]
+        expired_count = sum(value <= time.time() for value in expiry_values)
+        logger.info(f"{cookies_key} parsed: count={len(cookies)}, session_markers_present={[name for name in session_markers if name in cookie_names]}, expired_count={expired_count}")
         userData.append({
             "unique_id": unique_id,
             "username": username,
