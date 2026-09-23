@@ -16,15 +16,12 @@ def install_browser():
     except subprocess.CalledProcessError as e:
         print(f"发生未知错误：{e}")
 
-
 def get_browser():
     """
     启动浏览器实例
     :return: 浏览器实例
     """
-
     headless = True
-
     env = get_environment()
     if env == Environment.LOCAL:
         os.environ["PLAYWRIGHT_BROWSERS_PATH"] = os.path.abspath(
@@ -36,14 +33,15 @@ def get_browser():
         os.environ["PLAYWRIGHT_BROWSERS_PATH"] = os.path.abspath(
             os.path.join(os.path.dirname(sys.executable), PLAYWRIGHT_BROWSERS_PATH)
         )
-
     try:
-        # 启动浏览器
-        playwright = sync_playwright().start() 
-        browser = playwright.chromium.launch(headless=headless)
+        playwright = sync_playwright().start()
+        options = {"headless": headless}
+        if env == Environment.GITHUBACTION:
+            options["channel"] = "chrome"
+        browser = playwright.chromium.launch(**options)
+        print(f"Browser ready: {browser.version}; channel={options.get('channel', 'chromium')}")
         return playwright, browser
     except Exception as e:
-        # 捕获浏览器启动错误
         if "Executable doesn't exist" in str(e) and env != Environment.GITHUBACTION:
             print("浏览器可执行文件不存在！")
             install_browser()
