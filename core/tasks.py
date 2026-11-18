@@ -9,7 +9,7 @@ from utils.config import get_config, get_userData
 from utils import norm
 from core.msg_builder import build_message, build_message_with_openai
 from core.browser import get_browser
-from playwright.sync_api import Response
+from playwright.sync_api import Response, TimeoutError as PlaywrightTimeoutError
 import time
 
 config = get_config()
@@ -479,6 +479,17 @@ def do_user_task(browser, username, cookies, targets):
         # 点击好友后检查聊天窗口
         page.wait_for_timeout(15000)
 
+        chat_input_selector = CHAT_EDITOR_SELECTOR
+        chat_input = page.locator(chat_input_selector).locator('[contenteditable="true"]')
+        try:
+            chat_input.wait_for(
+                state="visible",
+                timeout=min(config["browserTimeout"], 30000),
+            )
+            editor_ready = True
+        except PlaywrightTimeoutError:
+            editor_ready = False
+
         capture_screenshot(
             page,
             path="logs/chat-after-select.png",
@@ -497,12 +508,25 @@ def do_user_task(browser, username, cookies, targets):
         # )
 
         logger.info(
-            "EDITOR_CHECK: old=%s, editable=%s, textbox=%s, iframes=%s",
+            "EDITOR_CHECK: container=%s, editable=%s, textbox=%s, iframes=%s, ready=%s",
             page.locator(CHAT_EDITOR_SELECTOR).count(),
-            page.locator('[contenteditable="true"]').count(),
+            chat_input.count(),
             page.get_by_role("textbox").count(),
             len(page.frames),
+            editor_ready,
         )
+
+        textbox_hints = page.get_by_role("textbox").evaluate_all(
+            """nodes => nodes.slice(0, 5).map(n => ({
+                tag: n.tagName,
+                className: typeof n.className === 'string' ? n.className.slice(0, 120) : '',
+                contenteditable: n.getAttribute('contenteditable'),
+                placeholder: n.getAttribute('placeholder'),
+                ariaLabel: n.getAttribute('aria-label'),
+                visible: n.getClientRects().length > 0
+            }))"""
+        )
+        logger.info("TEXTBOX_HINTS: %s", textbox_hints)
 
         logger.info(
             "WS_FRAMES: sent=%s received=%s",
@@ -539,15 +563,13 @@ def do_user_task(browser, username, cookies, targets):
 
         if not config["enableMessageSend"]:
             logger.info(
-                "DRY_RUN: editor detected for target; message sending is disabled. "
-                "Set ENABLE_MESSAGE_SEND=true only after validation."
+                "DRY_RUN: editor_ready=%s; message sending is disabled.",
+                editor_ready,
             )
             continue
 
-        # 等待聊天输入框元素加载完成，使用更稳定的属性选择器
-        chat_input_selector = CHAT_EDITOR_SELECTOR
-        page.wait_for_selector(chat_input_selector, timeout=config["browserTimeout"])
-        chat_input = page.locator(chat_input_selector).locator('[contenteditable="true"]')
+        if not editor_ready:
+            raise RuntimeError("聊天消息输入框未就绪，已停止发送以避免误发。")
 
         # 在 chat-input-dccKiL 中输入内容
         message = build_message()
