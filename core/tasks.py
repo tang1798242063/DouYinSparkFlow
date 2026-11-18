@@ -295,6 +295,37 @@ def do_user_task(browser, username, cookies, targets):
             logger.warning(f"HTTP 错误: {response.status} {url.netloc}{url.path}")
     page.on("requestfailed", network_failure)
     page.on("response", http_failure)
+    
+    # 诊断 IM HTTP 接口，不记录请求参数和敏感内容
+    def trace_im_response(response):
+        url = urlsplit(response.url)
+        if url.hostname == "imapi.douyin.com":
+            logger.info(
+                "IM_RESPONSE status=%s path=%s",
+                response.status,
+                url.path,
+            )
+
+    page.on("response", trace_im_response)
+
+    # 诊断抖音 WebSocket 连接
+    def trace_websocket(ws):
+        host = urlsplit(ws.url).hostname or ""
+
+        if host == "douyin.com" or host.endswith(".douyin.com"):
+            logger.info("WS_OPEN host=%s", host)
+
+            ws.on(
+                "close",
+                lambda *_: logger.warning("WS_CLOSE host=%s", host),
+            )
+            ws.on(
+                "socketerror",
+                lambda *_: logger.warning("WS_ERROR host=%s", host),
+            )
+
+    page.on("websocket", trace_websocket)
+
 
     page.on("response", handle_response)  # 监听响应，收集好友完整信息用于匹配
 
