@@ -328,11 +328,20 @@ def do_user_task(browser, username, cookies, targets):
                     data_keys,
                 )
             except Exception as exc:
+                try:
+                    content_type = response.header_value("content-type") or ""
+                    body_size = len(response.body())
+                except Exception:
+                    content_type = ""
+                    body_size = ""
                 logger.info(
-                    "IM_RESULT http_status=%s path=%s json_parse=%s",
+                    "IM_RESULT http_status=%s path=%s json_parse=%s "
+                    "content_type=%s body_bytes=%s",
                     response.status,
                     url.path,
                     type(exc).__name__,
+                    content_type[:80],
+                    body_size,
                 )
 
     page.on("response", trace_im_response)
@@ -528,8 +537,12 @@ def do_user_task(browser, username, cookies, targets):
             )
 
 
-        # 仅执行诊断，避免意外发送消息
-        raise RuntimeError("聊天窗口诊断完成：未发送消息")
+        if not config["enableMessageSend"]:
+            logger.info(
+                "DRY_RUN: editor detected for target; message sending is disabled. "
+                "Set ENABLE_MESSAGE_SEND=true only after validation."
+            )
+            continue
 
         # 等待聊天输入框元素加载完成，使用更稳定的属性选择器
         chat_input_selector = CHAT_EDITOR_SELECTOR
