@@ -42,9 +42,16 @@ def get_config():
         "browserTimeout": int(os.getenv("BROWSER_TIMEOUT", "120000")),
         "friendListTimeout": int(os.getenv("FRIEND_LIST_WAIT_TIME", "2000")),
         "taskRetryTimes": int(os.getenv("TASK_RETRY_TIMES", "3")),
+        "enableMessageSend": is_message_sending_enabled(),
         "logLevel": os.getenv("LOG_LEVEL", "DEBUG"),
     }
     return config
+
+def is_message_sending_enabled(value=None):
+    """Require an explicit opt-in before any outbound message is sent."""
+    if value is None:
+        value = os.getenv("ENABLE_MESSAGE_SEND", "")
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 def sanitize_cookies(cookies):
     if not isinstance(cookies, list):
@@ -105,3 +112,4 @@ def get_userData():
             "targets": [norm(t) for t in task.get("targets", [])],
         })
     return userData
+
