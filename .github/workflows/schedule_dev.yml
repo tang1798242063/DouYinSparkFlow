@@ -2,6 +2,14 @@
 
 name: 【dev（测试）分支】DouYin Spark Flow Schedule Run
 on:
+  push:
+    branches: [dev]
+    paths:
+      - ".github/workflows/schedule_dev.yml"
+      - "core/**"
+      - "utils/**"
+      - "tests/**"
+      - "main.py"
   workflow_dispatch: # 允许手动触发
   schedule: # 定时任务
     - cron: "0 1 * * *" # 每天 1:00 UTC（对应北京时间 9:00）
@@ -33,6 +41,9 @@ jobs:
         SECRETS_JSON: ${{ toJson(secrets) }}
       run: python utils/export_github_env.py
     - name: Run DouYin Spark Flow
+      # Push runs are safe diagnostics; only scheduled/manual runs may send.
+      env:
+        ENABLE_MESSAGE_SEND: ${{ github.event_name == 'push' && 'false' || secrets.ENABLE_MESSAGE_SEND }}
       run: python main.py
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
