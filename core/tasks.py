@@ -300,6 +300,22 @@ def do_user_task(browser, username, cookies, targets):
 
     # 注入 Cookie
     context.add_cookies(cookies)
+    
+    # 只检查 Cookie 名称，不记录 Cookie 的实际值
+    def check_cookie_status(stage):
+        stored = context.cookies("https://www.douyin.com")
+        names = {item["name"] for item in stored}
+
+        keys = ("sessionid", "sessionid_ss", "sid_tt", "sid_guard")
+        status = {key: key in names for key in keys}
+
+        logger.info(
+            f"COOKIE_CHECK [{stage}]: "
+            f"count={len(stored)}, session={status}"
+        )
+
+    check_cookie_status("after_injection")
+
 
     # 打开抖音网页聊天页面
     retry_operation(
@@ -311,7 +327,44 @@ def do_user_task(browser, username, cookies, targets):
         wait_until="domcontentloaded",
     )
 
+    # wait_for_chat_ready(page)
+    
+    page.wait_for_timeout(3000)
+
+    check_cookie_status("after_navigation")
+
+    login_visible = any(
+        page.get_by_text(text, exact=False).count() > 0
+        for text in ("扫码登录", "验证码登录", "Log in to Douyin")
+    )
+
+    logger.info(
+        f"LOGIN_CHECK: "
+        f"chat_items={page.locator(CONVERSATION_ITEM_SELECTOR).count()}, "
+        f"login_prompt={login_visible}, "
+        f"host={urlsplit(page.url).hostname}"
+    )
+
+    # wait_for_chat_ready(page)
+
+    page.wait_for_timeout(3000)
+
+    check_cookie_status("after_navigation")
+
+    login_visible = any(
+        page.get_by_text(text, exact=False).count() > 0
+        for text in ("扫码登录", "验证码登录", "Log in to Douyin")
+    )
+
+    logger.info(
+        f"LOGIN_CHECK: "
+        f"chat_items={page.locator(CONVERSATION_ITEM_SELECTOR).count()}, "
+        f"login_prompt={login_visible}, "
+        f"host={urlsplit(page.url).hostname}"
+    )
+
     wait_for_chat_ready(page)
+
 
     # logger.debug(f"账号 {username} 开始发送消息")
     # # 滚动并选择用户
