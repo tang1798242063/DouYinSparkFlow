@@ -48,6 +48,7 @@ jobs:
         LOG_LEVEL: ${{ vars.LOG_LEVEL }}
         TASKS: ${{ vars.TASKS }}
         COOKIES_30091802073: ${{ secrets.COOKIES_30091802073 }}
+        PROXY_ADDRESS: ${{ secrets.PROXY_ADDRESS }}
       run: python main.py
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
