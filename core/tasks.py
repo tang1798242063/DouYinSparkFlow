@@ -1,3 +1,4 @@
+import re
 import traceback
 import hashlib
 import os
@@ -333,6 +334,15 @@ def do_user_task(browser, username, cookies, targets):
             )
 
     page.on("websocket", trace_websocket)
+    
+    # 捕获网页脚本异常，避免记录完整 URL 和调用栈
+    def trace_page_error(error):
+        message = str(error).splitlines()[0]
+        message = re.sub(r"https?://\S+", "[URL]", message)
+        logger.warning("JS_PAGE_ERROR: %s", message[:160])
+
+    page.on("pageerror", trace_page_error)
+
 
 
     page.on("response", handle_response)  # 监听响应，收集好友完整信息用于匹配
@@ -438,16 +448,31 @@ def do_user_task(browser, username, cookies, targets):
             full_page=True,
         )
 
+        # logger.info(
+        #     "EDITOR_CHECK: old=%s, editable=%s, textbox=%s, iframes=%s",
+        #     "WS_FRAMES: sent=%s received=%s",
+        #     ws_frames["sent"],
+        #     ws_frames["received"],
+        #     page.locator(CHAT_EDITOR_SELECTOR).count(),
+        #     page.locator('[contenteditable="true"]').count(),
+        #     page.get_by_role("textbox").count(),
+        #     len(page.frames),
+        # )
+
         logger.info(
             "EDITOR_CHECK: old=%s, editable=%s, textbox=%s, iframes=%s",
-            "WS_FRAMES: sent=%s received=%s",
-            ws_frames["sent"],
-            ws_frames["received"],
             page.locator(CHAT_EDITOR_SELECTOR).count(),
             page.locator('[contenteditable="true"]').count(),
             page.get_by_role("textbox").count(),
             len(page.frames),
         )
+
+        logger.info(
+            "WS_FRAMES: sent=%s received=%s",
+            ws_frames["sent"],
+            ws_frames["received"],
+        )
+
 
         # 仅执行诊断，避免意外发送消息
         raise RuntimeError("聊天窗口诊断完成：未发送消息")
