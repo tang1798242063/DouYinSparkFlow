@@ -1,6 +1,7 @@
 import unittest
 
 import core.tasks as tasks
+from utils.config import is_message_sending_enabled
 
 
 class SelectorTests(unittest.TestCase):
@@ -11,5 +12,18 @@ class SelectorTests(unittest.TestCase):
         self.assertEqual(tasks.CHAT_EDITOR_SELECTOR, '.messageEditorimChatEditorContainer')
 
 
+class MessageSendingGateTests(unittest.TestCase):
+    def test_sending_requires_explicit_opt_in(self):
+        for value in (None, "", "false", "0", "off", "no"):
+            with self.subTest(value=value):
+                self.assertFalse(is_message_sending_enabled(value))
+
+    def test_sending_accepts_explicit_true_values(self):
+        for value in ("true", "1", "yes", "on", " TRUE "):
+            with self.subTest(value=value):
+                self.assertTrue(is_message_sending_enabled(value))
+
+
 if __name__ == '__main__':
     unittest.main()
+
