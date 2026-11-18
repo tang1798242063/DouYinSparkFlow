@@ -301,11 +301,39 @@ def do_user_task(browser, username, cookies, targets):
     def trace_im_response(response):
         url = urlsplit(response.url)
         if url.hostname == "imapi.douyin.com":
-            logger.info(
-                "IM_RESPONSE status=%s path=%s",
-                response.status,
-                url.path,
-            )
+            try:
+                payload = response.json()
+                business_code = payload.get("status_code", payload.get("status"))
+                data = payload.get("data")
+                if isinstance(data, dict):
+                    data_type = "object"
+                    data_count = ""
+                    data_keys = ",".join(sorted(str(key) for key in data.keys())[:12])
+                elif isinstance(data, list):
+                    data_type = "array"
+                    data_count = len(data)
+                    data_keys = ""
+                else:
+                    data_type = type(data).__name__
+                    data_count = ""
+                    data_keys = ""
+                logger.info(
+                    "IM_RESULT http_status=%s path=%s business_code=%s "
+                    "data_type=%s data_count=%s data_keys=%s",
+                    response.status,
+                    url.path,
+                    str(business_code)[:40],
+                    data_type,
+                    data_count,
+                    data_keys,
+                )
+            except Exception as exc:
+                logger.info(
+                    "IM_RESULT http_status=%s path=%s json_parse=%s",
+                    response.status,
+                    url.path,
+                    type(exc).__name__,
+                )
 
     page.on("response", trace_im_response)
     ws_frames = {"sent": 0, "received": 0}
@@ -473,6 +501,32 @@ def do_user_task(browser, username, cookies, targets):
             ws_frames["received"],
         )
 
+        for frame_index, frame in enumerate(page.frames):
+            frame_url = urlsplit(frame.url)
+            try:
+                frame_editors = frame.locator(CHAT_EDITOR_SELECTOR).count()
+                frame_editables = frame.locator('[contenteditable="true"]').count()
+                frame_textboxes = frame.get_by_role("textbox").count()
+            except Exception as exc:
+                logger.info(
+                    "FRAME_EDITOR_CHECK index=%s host=%s path=%s check_error=%s",
+                    frame_index,
+                    frame_url.hostname or "",
+                    frame_url.path,
+                    type(exc).__name__,
+                )
+                continue
+            logger.info(
+                "FRAME_EDITOR_CHECK index=%s host=%s path=%s editor=%s "
+                "editable=%s textbox=%s",
+                frame_index,
+                frame_url.hostname or "",
+                frame_url.path,
+                frame_editors,
+                frame_editables,
+                frame_textboxes,
+            )
+
 
         # 仅执行诊断，避免意外发送消息
         raise RuntimeError("聊天窗口诊断完成：未发送消息")
@@ -562,3 +616,4 @@ def capture_screenshot(page, **kwargs):
         page.screenshot(timeout=10000, **kwargs)
     except Exception as exc:
         logger.warning(f"诊断截图未保存，继续处理任务: {type(exc).__name__}")
+
