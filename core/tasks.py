@@ -307,13 +307,21 @@ def do_user_task(browser, username, cookies, targets):
             )
 
     page.on("response", trace_im_response)
-
+    ws_frames = {"sent": 0, "received": 0}
     # 诊断抖音 WebSocket 连接
     def trace_websocket(ws):
         host = urlsplit(ws.url).hostname or ""
 
         if host == "douyin.com" or host.endswith(".douyin.com"):
             logger.info("WS_OPEN host=%s", host)
+            def on_sent(_):
+                ws_frames["sent"] += 1
+
+            def on_received(_):
+                ws_frames["received"] += 1
+
+            ws.on("framesent", on_sent)
+            ws.on("framereceived", on_received)
 
             ws.on(
                 "close",
@@ -422,7 +430,7 @@ def do_user_task(browser, username, cookies, targets):
         logger.debug(f"账号 {username} 已选中好友 {username} 发送消息")
         
         # 点击好友后检查聊天窗口
-        page.wait_for_timeout(5000)
+        page.wait_for_timeout(15000)
 
         capture_screenshot(
             page,
@@ -432,6 +440,9 @@ def do_user_task(browser, username, cookies, targets):
 
         logger.info(
             "EDITOR_CHECK: old=%s, editable=%s, textbox=%s, iframes=%s",
+            "WS_FRAMES: sent=%s received=%s",
+            ws_frames["sent"],
+            ws_frames["received"],
             page.locator(CHAT_EDITOR_SELECTOR).count(),
             page.locator('[contenteditable="true"]').count(),
             page.get_by_role("textbox").count(),
