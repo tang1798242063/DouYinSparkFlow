@@ -34,11 +34,51 @@ def get_browser():
             os.path.join(os.path.dirname(sys.executable), PLAYWRIGHT_BROWSERS_PATH)
         )
     try:
+        # playwright = sync_playwright().start()
+        # options = {"headless": headless}
+        # if env == Environment.GITHUBACTION:
+        #     options["channel"] = "chrome"
+        # browser = playwright.chromium.launch(**options)
+
         playwright = sync_playwright().start()
         options = {"headless": headless}
+
         if env == Environment.GITHUBACTION:
             options["channel"] = "chrome"
+
+        # 读取代理配置
+        proxy_address = os.getenv("PROXY_ADDRESS", "").strip()
+
+        if proxy_address:
+            from urllib.parse import urlsplit, unquote
+
+            parsed = urlsplit(proxy_address)
+
+            if parsed.scheme not in ("http", "https", "socks5") or not parsed.hostname:
+                raise ValueError("PROXY_ADDRESS 格式错误")
+
+            host = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
+            server = f"{parsed.scheme}://{host}"
+
+            if parsed.port:
+                server += f":{parsed.port}"
+
+            proxy = {"server": server}
+
+            if parsed.username is not None:
+                proxy["username"] = unquote(parsed.username)
+
+            if parsed.password is not None:
+                proxy["password"] = unquote(parsed.password)
+
+            options["proxy"] = proxy
+            print("浏览器代理已配置")
+
+        else:
+            print("未配置浏览器代理")
+
         browser = playwright.chromium.launch(**options)
+
         print(f"Browser ready: {browser.version}; channel={options.get('channel', 'chromium')}")
         return playwright, browser
     except Exception as e:
