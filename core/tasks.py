@@ -389,6 +389,27 @@ def do_user_task(browser, username, cookies, targets):
     # 滚动并选择用户
     for username in scroll_and_select_user(page, username, targets):
         logger.debug(f"账号 {username} 已选中好友 {username} 发送消息")
+        
+        # 点击好友后检查聊天窗口
+        page.wait_for_timeout(5000)
+
+        capture_screenshot(
+            page,
+            path="logs/chat-after-select.png",
+            full_page=True,
+        )
+
+        logger.info(
+            "EDITOR_CHECK: old=%s, editable=%s, textbox=%s, iframes=%s",
+            page.locator(CHAT_EDITOR_SELECTOR).count(),
+            page.locator('[contenteditable="true"]').count(),
+            page.get_by_role("textbox").count(),
+            len(page.frames),
+        )
+
+        # 仅执行诊断，避免意外发送消息
+        raise RuntimeError("聊天窗口诊断完成：未发送消息")
+
         # 等待聊天输入框元素加载完成，使用更稳定的属性选择器
         chat_input_selector = CHAT_EDITOR_SELECTOR
         page.wait_for_selector(chat_input_selector, timeout=config["browserTimeout"])
